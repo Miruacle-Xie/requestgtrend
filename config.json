@@ -1,0 +1,9 @@
+{
+	"https_proxy": ["http://127.0.0.1:8000", "http://127.0.0.1:8001", "http://127.0.0.1:8002"], // 用的代理软件
+	"retries": 3, // 请求失败重连次数
+	"hl": "en-US", // 语言
+	"tz": 420, //时区
+	"user-agent": "根据自己的",
+    "authority": "trends.google.com",
+    "cookie": "根据自己的"
+}
