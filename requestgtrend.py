@@ -268,7 +268,7 @@ class GtrendReq:
                 # in case no rising topics are found, the lines above will throw a KeyError
                 df_rising = None
 
-            result_dict[kw] = {'rising': df_rising, 'top': df_top}
+            result_dict[self.kw_list[0]] = {'rising': df_rising, 'top': df_top}
         return result_dict
 
 
@@ -341,7 +341,7 @@ def main():
     # input(trends.retries)
     try:
         for i in range(len(df_subj)):
-            if i != 1:
+            if i != 0:
                 continue
             '''
             subjectpath = gtrendhtmlpath + df_subj[colname[0]][i] + "\\"
@@ -448,28 +448,29 @@ def main():
             #     os.rmdir(subjectpath)
         time_end = time.time()
 
-        resultwriter = pd.ExcelWriter(gtrendhtmlpath + "主题趋势报告.xlsx")
-        result = pd.concat([pd.DataFrame({'有趋势图的主题': trendlist}),
-                            pd.DataFrame({'5年有相关主题的主题': related5ylist}),
-                            pd.DataFrame({'7天有相关主题的主题': related7dlist})], axis=1)
-        result.to_excel(resultwriter, sheet_name="有趋势图", index=False)
-
-        result1 = pd.concat([pd.DataFrame({'无趋势图的主题': notrendlist}),
-                             pd.DataFrame({'5年无相关主题的主题': norelated5ylist}),
-                             pd.DataFrame({'7天无相关主题的主题': norelated7dlist})], axis=1)
-        result1.to_excel(resultwriter, sheet_name="无趋势图", index=False)
-
-        result2 = pd.concat([df_subj,
-                             pd.DataFrame({'获取趋势url': trendurl}),
-                             pd.DataFrame({'获取7天主题url': topicurl})], axis=1)
-        result2.to_excel(resultwriter, sheet_name="url", index=False)
-
-        resultwriter.save()
-
-        input("已生成报告, 耗时时间:{}, 平均耗时:{}, 按回车键结束".format(time_end - time_start, (time_end - time_start) / len(df_subj)))
     except Exception as e:
         print(repr(e))
         input("出现异常，请勿关闭")
+
+    resultwriter = pd.ExcelWriter(gtrendhtmlpath + "主题趋势报告.xlsx")
+    result = pd.concat([pd.DataFrame({'有趋势图的主题': trendlist}),
+                        pd.DataFrame({'5年有相关主题的主题': related5ylist}),
+                        pd.DataFrame({'7天有相关主题的主题': related7dlist})], axis=1)
+    result.to_excel(resultwriter, sheet_name="有趋势图", index=False)
+
+    result1 = pd.concat([pd.DataFrame({'无趋势图的主题': notrendlist}),
+                         pd.DataFrame({'5年无相关主题的主题': norelated5ylist}),
+                         pd.DataFrame({'7天无相关主题的主题': norelated7dlist})], axis=1)
+    result1.to_excel(resultwriter, sheet_name="无趋势图", index=False)
+
+    result2 = pd.concat([df_subj,
+                         pd.DataFrame({'获取趋势url': trendurl}),
+                         pd.DataFrame({'获取7天主题url': topicurl})], axis=1)
+    result2.to_excel(resultwriter, sheet_name="url", index=False)
+
+    resultwriter.save()
+
+    input("已生成报告, 耗时时间:{}, 平均耗时:{}, 按回车键结束".format(time_end - time_start, (time_end - time_start) / len(df_subj)))
 
 
 if __name__ == "__main__":
