@@ -341,8 +341,8 @@ def main():
     # input(trends.retries)
     try:
         for i in range(len(df_subj)):
-            if i != 0:
-                continue
+            # if i != 0:
+            #     continue
             '''
             subjectpath = gtrendhtmlpath + df_subj[colname[0]][i] + "\\"
             if not os.path.isdir(subjectpath):
