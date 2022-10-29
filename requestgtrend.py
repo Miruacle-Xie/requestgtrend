@@ -62,7 +62,7 @@ class GtrendReq:
                 print(response.url)
                 print(response.status_code)
                 print(response.text)
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 400:
                 print("\n#=============================================================================")
                 break
             else:
@@ -111,8 +111,7 @@ class GtrendReq:
         # requests will mangle this if it is not a string
         self.token_payload['req'] = json.dumps(self.token_payload['req'], separators=(',', ':'))
         self.prepare_post_url = urlencode(self.token_payload, safe=":,")
-        self._tokens()
-        return
+        return self._tokens()
 
     def _tokens(self):
         """Makes request to Google to get API tokens for interest over time, interest by region and related queries"""
@@ -125,7 +124,13 @@ class GtrendReq:
             self.prepare_post_url,
             method=GtrendReq.POST_METHOD,
             trim_chars=4,
-        )['widgets']
+        )
+        # )['widgets']
+
+        if widget_dicts is None:
+            return False
+
+        widget_dicts = widget_dicts['widgets']
         # order of the json matters...
         first_region_token = True
         # clear self.related_queries_widget_list and self.related_topics_widget_list
@@ -148,7 +153,7 @@ class GtrendReq:
                 self.related_topics_widget_list.append(widget)
             if 'RELATED_QUERIES' in widget['id']:
                 self.related_queries_widget_list.append(widget)
-        return
+        return True
 
     def interest_over_time(self):
         """Request data from Google's Interest Over Time section and return a dataframe"""
@@ -339,118 +344,116 @@ def main():
     trends = GtrendReq(hl=config["hl"], tz=config["tz"], retries=config["retries"])
     trends.headers = headers
     # input(trends.retries)
-    try:
-        for i in range(len(df_subj)):
-            # if i != 0:
-            #     continue
-            '''
-            subjectpath = gtrendhtmlpath + df_subj[colname[0]][i] + "\\"
-            if not os.path.isdir(subjectpath):
-                os.mkdir(subjectpath)
-            '''
+    for i in range(len(df_subj)):
+        # if i != 0:
+        #     continue
 
+        try:
             #  五年趋势
-            print("{}-{}:".format(i+1, df_subj[colname[0]][i]))
+            print("{}-{}:".format(i + 1, df_subj[colname[0]][i]))
             print("请求5年POST...")
-            trends.build_payload([df_subj[colname[0]][i]], timeframe="today 5-y")
-            # '''
-            print("\n请求5年趋势...")
-            df = trends.interest_over_time()
-            trendurl.append(trends.prepare_gettrend_url)
-            # print(df)
-            if df is None:
-                notrendlist.append(df_subj[colname[0]][i] + "超时异常")
-                norelated5ylist.append(df_subj[colname[0]][i] + "超时异常")
-                norelated7dlist.append(df_subj[colname[0]][i] + "超时异常")
-                continue
+            postflag = trends.build_payload([df_subj[colname[0]][i]], timeframe="today 5-y")
+            if not postflag:
+                raise NameError("{}:POST请求异常".format(df_subj[colname[0]][i]))
+        except NameError as e:
+            # print(repr(e))
+            print("{}:请求5年POST异常".format(df_subj[colname[0]][i]))
+            notrendlist.append(df_subj[colname[0]][i] + "POST请求异常, 请检查主题")
+            norelated5ylist.append(df_subj[colname[0]][i] + "POST请求异常, 请检查主题")
+            norelated7dlist.append(df_subj[colname[0]][i] + "POST请求异常, 请检查主题")
+            trendurl.append(None)
+            topicurl.append(None)
+            print("#=============================================================================\n")
+            continue
 
-            if df.empty:
-                print("该主题无趋势")
-                notrendlist.append(df_subj[colname[0]][i])
-                norelated5ylist.append(df_subj[colname[0]][i])
-                # print(notrendlist)
-                # print(norelated5ylist)
-            else:
-                # 绘制图形
-                df = df.reset_index()
-                gtrendplotly(df, htmlfolderpath)
-                trendlist.append(df_subj[colname[0]][i])
+        print("\n请求5年趋势...")
+        df = trends.interest_over_time()
+        trendurl.append(GtrendReq.INTEREST_OVER_TIME_URL + "?" + trends.prepare_gettrend_url)
+        if df is None:
+            notrendlist.append(df_subj[colname[0]][i] + "超时异常")
+            norelated5ylist.append(df_subj[colname[0]][i] + "超时异常")
+            norelated7dlist.append(df_subj[colname[0]][i] + "超时异常")
+            continue
 
-                # 获取相关主题
-                print("\n请求5年相关主题...")
-                related_topics_5y = trends.related_topics()
-                if related_topics_5y is None:
-                    norelated5ylist.append(df_subj[colname[0]][i] + "超时异常")
-                else:
-                    if not related_topics_5y[df_subj[colname[0]][i]]["rising"].empty and not \
-                            related_topics_5y[df_subj[colname[0]][i]]["top"].empty:
-                        writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
-                                                engine='openpyxl')
-                        if related_topics_5y[df_subj[colname[0]][i]]["rising"].empty:
-                            print("该主题无5年相关上升主题")
-                        else:
-                            related_topics_5y[df_subj[colname[0]][i]]["rising"].to_excel(writer, index=False,
-                                                                                         sheet_name="rising-5year")
+        if df.empty:
+            print("该主题无趋势")
+            notrendlist.append(df_subj[colname[0]][i])
+            norelated5ylist.append(df_subj[colname[0]][i])
+        else:
+            # 绘制图形
+            df = df.reset_index()
+            gtrendplotly(df, htmlfolderpath)
+            trendlist.append(df_subj[colname[0]][i])
 
-                        if related_topics_5y[df_subj[colname[0]][i]]["top"].empty:
-                            print("该主题无5年相关热门主题")
-                        else:
-                            related_topics_5y[df_subj[colname[0]][i]]["top"].to_excel(writer, index=False,
-                                                                                      sheet_name="top-5year")
-                        writer.save()
-                        related5ylist.append(df_subj[colname[0]][i])
-                    else:
-                        print("该主题无5年相关主题")
-                        norelated5ylist.append(df_subj[colname[0]][i])
-                        # input(norelated5ylist)
-            # '''
-
-            time.sleep(random.uniform(1, 3))
-            # 7天主题
-            print("\n请求7天POST...")
-            trends.build_payload([df_subj[colname[0]][i]], timeframe="now 7-d")
             # 获取相关主题
-            print("\n请求7天相关主题...")
-            related_topics_7d = trends.related_topics()
-            topicurl.append(trends.prepare_getrelatedtopic_url)
-            if related_topics_7d is None:
-                norelated7dlist.append(df_subj[colname[0]][i] + "超时异常")
+            print("\n请求5年相关主题...")
+            related_topics_5y = trends.related_topics()
+            if related_topics_5y is None:
+                norelated5ylist.append(df_subj[colname[0]][i] + "超时异常")
             else:
-                if not related_topics_7d[df_subj[colname[0]][i]]["rising"].empty or not \
-                        related_topics_7d[df_subj[colname[0]][i]]["top"].empty:
-                    if os.path.exists(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx"):
-                        writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
-                                                engine='openpyxl', mode='a')
+                if not related_topics_5y[df_subj[colname[0]][i]]["rising"].empty and not \
+                        related_topics_5y[df_subj[colname[0]][i]]["top"].empty:
+                    writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
+                                            engine='openpyxl')
+                    if related_topics_5y[df_subj[colname[0]][i]]["rising"].empty:
+                        print("该主题无5年相关上升主题")
                     else:
-                        writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
-                                                engine='openpyxl')
-                    if related_topics_7d[df_subj[colname[0]][i]]["rising"].empty:
-                        print("该主题无7天相关上升主题")
-                    else:
-                        related_topics_7d[df_subj[colname[0]][i]]["rising"].to_excel(writer, index=False,
-                                                                                     sheet_name="rising-7day")
+                        related_topics_5y[df_subj[colname[0]][i]]["rising"].to_excel(writer, index=False,
+                                                                                     sheet_name="rising-5year")
 
-                    if related_topics_7d[df_subj[colname[0]][i]]["top"].empty:
-                        print("该主题无7天相关热门主题")
+                    if related_topics_5y[df_subj[colname[0]][i]]["top"].empty:
+                        print("该主题无5年相关热门主题")
                     else:
-                        related_topics_7d[df_subj[colname[0]][i]]["top"].to_excel(writer, index=False,
-                                                                                  sheet_name="top-7day")
+                        related_topics_5y[df_subj[colname[0]][i]]["top"].to_excel(writer, index=False,
+                                                                                  sheet_name="top-5year")
                     writer.save()
-                    related7dlist.append(df_subj[colname[0]][i])
+                    related5ylist.append(df_subj[colname[0]][i])
                 else:
-                    print("该主题无7天相关主题")
-                    norelated7dlist.append(df_subj[colname[0]][i])
-                    # input(norelated7dlist)
-            os.environ["https_proxy"] = config["https_proxy"][random.randint(0, len(config["https_proxy"]) - 1)]
-            print(os.environ["https_proxy"]+"\n")
-            # writer.save()
-            # if len(os.listdir(subjectpath)) == 0:
-            #     os.rmdir(subjectpath)
-        time_end = time.time()
+                    print("该主题无5年相关主题")
+                    norelated5ylist.append(df_subj[colname[0]][i])
+                    # input(norelated5ylist)
 
-    except Exception as e:
-        print(repr(e))
-        input("出现异常，请勿关闭")
+        time.sleep(random.uniform(1, 3))
+        # 7天主题
+        print("\n请求7天POST...")
+        trends.build_payload([df_subj[colname[0]][i]], timeframe="now 7-d")
+        # 获取相关主题
+        print("\n请求7天相关主题...")
+        related_topics_7d = trends.related_topics()
+        topicurl.append(GtrendReq.RELATED_QUERIES_URL + "?" +trends.prepare_getrelatedtopic_url)
+        if related_topics_7d is None:
+            norelated7dlist.append(df_subj[colname[0]][i] + "超时异常")
+        else:
+            if not related_topics_7d[df_subj[colname[0]][i]]["rising"].empty or not \
+                    related_topics_7d[df_subj[colname[0]][i]]["top"].empty:
+                if os.path.exists(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx"):
+                    writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
+                                            engine='openpyxl', mode='a')
+                else:
+                    writer = pd.ExcelWriter(relatedtopicpath + df_subj[colname[0]][i] + "-risingtop.xlsx",
+                                            engine='openpyxl')
+                if related_topics_7d[df_subj[colname[0]][i]]["rising"].empty:
+                    print("该主题无7天相关上升主题")
+                else:
+                    related_topics_7d[df_subj[colname[0]][i]]["rising"].to_excel(writer, index=False,
+                                                                                 sheet_name="rising-7day")
+
+                if related_topics_7d[df_subj[colname[0]][i]]["top"].empty:
+                    print("该主题无7天相关热门主题")
+                else:
+                    related_topics_7d[df_subj[colname[0]][i]]["top"].to_excel(writer, index=False,
+                                                                              sheet_name="top-7day")
+                writer.save()
+                related7dlist.append(df_subj[colname[0]][i])
+            else:
+                print("该主题无7天相关主题")
+                norelated7dlist.append(df_subj[colname[0]][i])
+                # input(norelated7dlist)
+
+        os.environ["https_proxy"] = config["https_proxy"][random.randint(0, len(config["https_proxy"]) - 1)]
+        print("切换至:" + os.environ["https_proxy"] + "\n")
+
+    time_end = time.time()
 
     resultwriter = pd.ExcelWriter(gtrendhtmlpath + "主题趋势报告.xlsx")
     result = pd.concat([pd.DataFrame({'有趋势图的主题': trendlist}),
